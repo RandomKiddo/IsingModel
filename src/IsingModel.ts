@@ -91,4 +91,26 @@ export class IsingModel {
 
         return total/(N*N);
     }
+
+    public getEnergy(): number {
+        let interactionSum = 0;
+        let fieldSum = 0;
+        const N = this.params.size;
+
+        for (let i = 0; i < N; ++i) {
+            for (let j = 0; j < N; ++j) {
+                const spin = this.grid[i][j];
+
+                const right = this.getSpin(i+1, j);
+                const down = this.getSpin(i, j+1);
+
+                interactionSum += spin*(right + down);
+                fieldSum += spin;
+            }
+        }
+
+        const totalE = -this.params.J*interactionSum - this.params.field*fieldSum;
+
+        return totalE / (N*N); // Normalized energy per spin
+    }
 }

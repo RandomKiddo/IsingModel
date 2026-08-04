@@ -112,3 +112,21 @@ button:hover {
   height: 380px;
   position: relative;
 }
+
+.preset-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-btn {
+  background-color: #2a2a35;
+  border: 1px solid #3a3a4a;
+  padding: 6px;
+  font-size: 0.8rem;
+  margin-top: 0;
+}
+
+.preset-btn:hover {
+  background-color: #3b3b4a;
+}
