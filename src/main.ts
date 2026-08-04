@@ -21,40 +21,22 @@ const model = new IsingModel({
 let stepsPerFrame = 1;
 
 // --- Chart Factory Helper ---
-const maxPoints = 100;
-function createChart(
-  canvasId: string, 
-  label: string, 
-  color: string, 
-  minY?: number, 
-  maxY?: number
-) {
+// Increased maxPoints to 300 to show a longer time history
+const maxPoints = 300; 
+function createChart(canvasId: string, label: string, color: string, minY?: number, maxY?: number) {
   const chartCtx = (document.getElementById(canvasId) as HTMLCanvasElement).getContext('2d')!;
   return new Chart(chartCtx, {
     type: 'line',
     data: {
       labels: Array.from({ length: maxPoints }, (_, i) => i),
-      datasets: [
-        {
-          label,
-          data: Array(maxPoints).fill(0),
-          borderColor: color,
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.1,
-        },
-      ],
+      datasets: [{ label, data: Array(maxPoints).fill(0), borderColor: color, borderWidth: 2, pointRadius: 0, tension: 0.1 }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
       scales: {
-        y: {
-          min: minY, // If passed undefined, Chart.js auto-scales
-          max: maxY, // If passed undefined, Chart.js auto-scales
-          grid: { color: '#2e2e38' },
-        },
+        y: { min: minY, max: maxY, grid: { color: '#2e2e38' } },
         x: { display: false },
       },
     },
@@ -62,58 +44,106 @@ function createChart(
 }
 
 const magChart = createChart('mag-chart-canvas', 'Magnetization <M>', '#6366f1', -1.0, 1.0);
-const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899');
+const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899', -2.0, 2.0);
+
+// --- 1. Dynamic Energy Bounds Logic (ADDED HERE) ---
+let minObservedEnergy = -2.0;
+let maxObservedEnergy = 2.0;
+
+function updateEnergyChartBounds(currentE: number) {
+  let boundsChanged = false;
+
+  if (currentE < minObservedEnergy) {
+    minObservedEnergy = currentE - Math.abs(currentE * 0.15);
+    boundsChanged = true;
+  }
+  if (currentE > maxObservedEnergy) {
+    maxObservedEnergy = currentE + Math.abs(currentE * 0.15);
+    boundsChanged = true;
+  }
+
+  if (boundsChanged && energyChart.options.scales?.y) {
+    energyChart.options.scales.y.min = minObservedEnergy;
+    energyChart.options.scales.y.max = maxObservedEnergy;
+  }
+}
+
+function resetEnergyBounds() {
+  minObservedEnergy = -2.0;
+  maxObservedEnergy = 2.0;
+  if (energyChart.options.scales?.y) {
+    energyChart.options.scales.y.min = minObservedEnergy;
+    energyChart.options.scales.y.max = maxObservedEnergy;
+  }
+}
 
 // --- Control Listeners ---
 const tempSlider = document.getElementById('temp') as HTMLInputElement;
 const tempVal = document.getElementById('temp-val')!;
+const fieldSlider = document.getElementById('field') as HTMLInputElement;
+const fieldVal = document.getElementById('field-val')!;
+const jSlider = document.getElementById('coupling') as HTMLInputElement;
+const jVal = document.getElementById('j-val')!;
+const boundarySelect = document.getElementById('boundary') as HTMLSelectElement;
 const speedSlider = document.getElementById('speed') as HTMLInputElement;
 const speedVal = document.getElementById('speed-val')!;
+const resetBtn = document.getElementById('reset-btn')!;
 
-// 1. Temperature Control
+// Synchronize controls with model state on startup
+function syncControlsWithModel() {
+  tempSlider.value = model.params.temperature.toString();
+  tempVal.textContent = model.params.temperature.toFixed(2);
+
+  fieldSlider.value = model.params.field.toString();
+  fieldVal.textContent = model.params.field.toFixed(2);
+
+  jSlider.value = model.params.J.toString();
+  jVal.textContent = model.params.J.toFixed(2);
+
+  boundarySelect.value = model.params.boundary;
+
+  speedSlider.value = stepsPerFrame.toString();
+  speedVal.textContent = stepsPerFrame.toString();
+}
+
+syncControlsWithModel();
+
 function setTemperature(val: number) {
   model.params.temperature = val;
   tempSlider.value = val.toString();
   tempVal.textContent = val.toFixed(2);
 }
+
 tempSlider.addEventListener('input', () => setTemperature(parseFloat(tempSlider.value)));
 
-// 2. Magnetic Field (H) Control (ADDED)
-const fieldSlider = document.getElementById('field') as HTMLInputElement;
-const fieldVal = document.getElementById('field-val')!;
 fieldSlider.addEventListener('input', () => {
   const val = parseFloat(fieldSlider.value);
   model.params.field = val;
   fieldVal.textContent = val.toFixed(2);
+  resetEnergyBounds(); // Reset scale on field change
 });
 
-// 3. Coupling Constant (J) Control (ADDED)
-const jSlider = document.getElementById('coupling') as HTMLInputElement;
-const jVal = document.getElementById('j-val')!;
 jSlider.addEventListener('input', () => {
   const val = parseFloat(jSlider.value);
   model.params.J = val;
   jVal.textContent = val.toFixed(2);
+  resetEnergyBounds(); // Reset scale on J change
 });
 
-// 4. Boundary Condition Control (ADDED)
-const boundarySelect = document.getElementById('boundary') as HTMLSelectElement;
 boundarySelect.addEventListener('change', () => {
   model.params.boundary = boundarySelect.value as BoundaryCondition;
 });
 
-// 5. Simulation Speed Control
 speedSlider.addEventListener('input', () => {
   stepsPerFrame = parseInt(speedSlider.value, 10);
   speedVal.textContent = stepsPerFrame.toString();
 });
 
-// 6. Reset Button (ADDED)
-const resetBtn = document.getElementById('reset-btn')!;
 resetBtn.addEventListener('click', () => {
   model.grid = Array.from({ length: GRID_SIZE }, () =>
     Array.from({ length: GRID_SIZE }, () => (Math.random() < 0.5 ? 1 : -1))
   );
+  resetEnergyBounds(); // Reset scale on manual grid reset
 });
 
 // Presets
@@ -145,19 +175,22 @@ function drawGrid() {
 }
 
 function loop() {
-  // Speed control: Run multiple sweeps per frame
   for (let s = 0; s < stepsPerFrame; s++) {
     model.step();
   }
 
   drawGrid();
 
-  // Dual Plotting
+  // Magnetization Plot
   magChart.data.datasets[0].data.push(model.getMagnetization());
   magChart.data.datasets[0].data.shift();
   magChart.update('none');
 
-  energyChart.data.datasets[0].data.push(model.getEnergy());
+  // --- 2. Energy Plot Call with Bound Check (UPDATED HERE) ---
+  const currentE = model.getEnergy();
+  updateEnergyChartBounds(currentE);
+
+  energyChart.data.datasets[0].data.push(currentE);
   energyChart.data.datasets[0].data.shift();
   energyChart.update('none');
 
@@ -177,22 +210,3 @@ window.addEventListener('DOMContentLoaded', () => {
     throwOnError: false
   });
 });
-
-function syncControlsWithModel() {
-  tempSlider.value = model.params.temperature.toString();
-  tempVal.textContent = model.params.temperature.toFixed(2);
-
-  fieldSlider.value = model.params.field.toString();
-  fieldVal.textContent = model.params.field.toFixed(2);
-
-  jSlider.value = model.params.J.toString();
-  jVal.textContent = model.params.J.toFixed(2);
-
-  boundarySelect.value = model.params.boundary;
-  
-  speedSlider.value = stepsPerFrame.toString();
-  speedVal.textContent = stepsPerFrame.toString();
-}
-
-// Call it once on startup
-syncControlsWithModel();
