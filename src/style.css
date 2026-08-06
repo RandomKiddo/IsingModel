@@ -1,3 +1,17 @@
+/*
+ * File: style.css
+ * 
+ * CSS styling for the web page deployment of this simulation.
+ * 
+ * Programmer: Neil Ghugare
+ * 
+ * Revision History:
+ * 08/06/2026 - Created initial version.
+ * 
+ * Notes:
+ */
+
+
 * {
   box-sizing: border-box;
   margin: 0;
