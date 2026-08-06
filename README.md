@@ -64,7 +64,7 @@ To keep single threaded JavaScript running at 60 FPS under heavy statistical sam
 
 ### Prerequisites
 
-* [Node.js](https://www.google.com/search?q=https://nodejs.org/) (v18 or higher recommended).
+* [Node.js](https://nodejs.org/en) (v18 or higher recommended).
 * `npm` or `pnpm`. 
 
 ### Installation & Local Setup
