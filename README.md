@@ -108,7 +108,6 @@ Distributed under the MIT License. See LICENSE for details.
 Copyright © 2026 RandomKiddo
 
 ___
-<br />
 
 [Back to Top](#2d-ising-model-simulation)
 
