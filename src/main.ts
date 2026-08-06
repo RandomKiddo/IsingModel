@@ -1,15 +1,32 @@
+/*
+ * File: main.ts
+ * 
+ * The main TypeScript loop that runs the HTML and front-end of the Ising model simulation.
+ * 
+ * Programmer: Neil Ghugare
+ * 
+ * Revision History:
+ * 08/06/2026 - Created initial version.
+ * 
+ * Notes:
+ * In the root directory above this file, with the other required files and installs,
+ * this filed can be run with 'npm run dev'.
+ */
+
 import { IsingModel, type BoundaryCondition } from './IsingModel';
 import Chart from 'chart.js/auto';
 
-// Setup Canvas Constants
+// Setup canvas constants
 const GRID_SIZE = 100;
 const CANVAS_SIZE = 400;
 
+// Get the grid canvas and its context and set its size
 const canvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 canvas.width = CANVAS_SIZE;
 canvas.height = CANVAS_SIZE;
 
+// Instantiate a new IsingModel simulation instance with some default values
 const model = new IsingModel({
   size: GRID_SIZE,
   temperature: 2.27,
@@ -18,10 +35,13 @@ const model = new IsingModel({
   boundary: 'periodic',
 });
 
+// The amount of steps per frame
 let stepsPerFrame = 1;
 
 // --- Chart Factory Helper ---
-const maxPoints = 300; 
+const maxPoints = 300;  // Maximum number of points for the hysteresis plotting later
+
+// Creates a chart based on the canvasId, label, color, yTitle, and y-bounds (if applicable)
 function createChart(canvasId: string, label: string, color: string, yTitle: string, minY?: number, maxY?: number) {
   const chartCtx = (document.getElementById(canvasId) as HTMLCanvasElement).getContext('2d')!;
   return new Chart(chartCtx, {
@@ -42,11 +62,11 @@ function createChart(canvasId: string, label: string, color: string, yTitle: str
   });
 }
 
-// 1. Line Charts (Magnetization & Energy)
+// Make line charts for magnetization and energy plots
 const magChart = createChart('mag-chart-canvas', 'Magnetization ⟨M⟩', '#6366f1', 'Magnetization ⟨M⟩', -1.0, 1.0);
 const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899', 'Energy per Spin (E)', -2.0, 2.0);
 
-// 2. Scatter Chart (Hysteresis M vs H)
+// Scatter chart for the hysteresis loop
 const hystCtx = (document.getElementById('hyst-chart-canvas') as HTMLCanvasElement).getContext('2d')!;
 const hystChart = new Chart(hystCtx, {
   type: 'scatter',
@@ -88,18 +108,25 @@ const hystChart = new Chart(hystCtx, {
 let minObservedEnergy = -2.0;
 let maxObservedEnergy = 2.0;
 
+// Update the energy chart bounds based on the current range of values saved in the time series
+// Also makes sure the range doesn't get too narrow based on a MIN_SPAN range
 function updateEnergyChartBounds() {
+  // Gets current data from the chart
   const currentData = energyChart.data.datasets[0].data as number[];
 
+  // If nothing is showing right now then skip 
   if (currentData.length === 0) {
     return;
   }
 
+  // Get the current min, max, and span of the data
   let min = Math.min(...currentData);
   let max = Math.max(...currentData);
 
   let span = max-min; 
 
+  // Check if the current data span is less than a reasonable range (meaning the data is too fine)
+  // If it is too fine, then expand the range to be the minimum span range MIN_SPAN
   const MIN_SPAN = 1.0;
   if (span < MIN_SPAN) {
     const mid = (min+max)/2;
@@ -108,15 +135,18 @@ function updateEnergyChartBounds() {
     span = MIN_SPAN;
   }
 
+  // Pad the min and max so that way the chart has some more wiggle room
   const paddedMin = min - span*0.15;
   const paddedMax = max + span*0.15;
 
+  // Set the new scales and bounds of the chart
   if (energyChart.options.scales?.y) {
     energyChart.options.scales.y.min = paddedMin;
     energyChart.options.scales.y.max = paddedMax;
   }
 }
 
+// Resets the bounds of the energy graph
 function resetEnergyBounds() {
   minObservedEnergy = -2.0;
   maxObservedEnergy = 2.0;
@@ -162,14 +192,17 @@ function syncControlsWithModel() {
 
 syncControlsWithModel();
 
+// Set the current temperature of the model
 function setTemperature(val: number) {
   model.params.temperature = val;
   tempSlider.value = val.toString();
   tempVal.textContent = val.toFixed(2);
 }
 
+// Check for a new temperature and set it from the slider
 tempSlider.addEventListener('input', () => setTemperature(parseFloat(tempSlider.value)));
 
+//  Update the field value based on the slider
 fieldSlider.addEventListener('input', () => {
   const val = parseFloat(fieldSlider.value);
   model.params.field = val;
@@ -177,6 +210,7 @@ fieldSlider.addEventListener('input', () => {
   resetEnergyBounds();
 });
 
+// Update a new J value based on the slider
 jSlider.addEventListener('input', () => {
   const val = parseFloat(jSlider.value);
   model.params.J = val;
@@ -184,19 +218,23 @@ jSlider.addEventListener('input', () => {
   resetEnergyBounds();
 });
 
+// Allow for changing the boundary conditions
 boundarySelect.addEventListener('change', () => {
   model.params.boundary = boundarySelect.value as BoundaryCondition;
 });
 
+// Allow for changing the algorithm being used
 algoSelect.addEventListener('change', () => {
   model.algorithm = algoSelect.value as 'metropolis' | 'wolff';
 });
 
+// Set a new simulation speed from the slider
 speedSlider.addEventListener('input', () => {
   stepsPerFrame = parseInt(speedSlider.value, 10);
   speedVal.textContent = stepsPerFrame.toString();
 });
 
+// Reset the grid to a random state
 resetBtn.addEventListener('click', () => {
   model.grid = Array.from({ length: GRID_SIZE }, () =>
     Array.from({ length: GRID_SIZE }, () => (Math.random() < 0.5 ? 1 : -1))
@@ -204,6 +242,7 @@ resetBtn.addEventListener('click', () => {
   resetEnergyBounds();
 });
 
+// Reset the grid parameters when clicking this button to the default values
 resetBtnGrid.addEventListener('click', () => {
   model.params.temperature = 2.27;
   tempSlider.value = '2.27';
@@ -235,6 +274,7 @@ resetBtnGrid.addEventListener('click', () => {
   speedVal.textContent = '1';
 });
 
+// Pause button to temporarily pause the simulation
 let isPaused = false;
 pauseBtn.addEventListener('click', () =>{
   isPaused = !isPaused;
@@ -242,19 +282,21 @@ pauseBtn.addEventListener('click', () =>{
   pauseBtn.classList.toggle('active', isPaused);
 })
 
-// Presets
+// Preset temperature values
 document.getElementById('preset-zero')!.addEventListener('click', () => setTemperature(0.1));
 document.getElementById('preset-tc')!.addEventListener('click', () => setTemperature(2.27));
 document.getElementById('preset-high')!.addEventListener('click', () => setTemperature(5.0));
 
 // --- Hysteresis Auto-Sweep Logic ---
 let isSweepingHysteresis = false;
-let sweepDirection = 1; // 1 = increasing H, -1 = decreasing H
+let sweepDirection = 1;  // 1 = increasing H, -1 = decreasing H
 
+// Start or stop the hysteresis loop accordingly
 hystBtn.addEventListener('click', () => {
   isSweepingHysteresis = !isSweepingHysteresis;
   hystBtn.textContent = isSweepingHysteresis ? 'Stop Field Sweep' : 'Start Field Sweep ($H$)';
   
+  // Render the LaTeX on the button itself
   if (typeof renderMathInElement === 'function') {
     renderMathInElement(hystBtn, {
       delimiters: [{ left: '$', right: '$', display: false }],
@@ -262,29 +304,36 @@ hystBtn.addEventListener('click', () => {
   }
   
   if (isSweepingHysteresis) {
-    hystChart.data.datasets[0].data = []; // Clear previous loop data
+    hystChart.data.datasets[0].data = [];  // Clear previous loop data
   }
 });
 
 // --- Render Loop ---
+
+// Draws the current grid
 function drawGrid() {
+  // Get the cell size and image data
   const cellSize = CANVAS_SIZE / GRID_SIZE;
   const imgData = ctx.createImageData(CANVAS_SIZE, CANVAS_SIZE);
   const data = imgData.data;
 
-  for (let i = 0; i < GRID_SIZE; i++) {
-    for (let j = 0; j < GRID_SIZE; j++) {
-      for (let px = 0; px < cellSize; px++) {
-        for (let py = 0; py < cellSize; py++) {
+  // Loop over the grid and cell sizes
+  for (let i = 0; i < GRID_SIZE; ++i) {
+    for (let j = 0; j < GRID_SIZE; ++j) {
+      for (let px = 0; px < cellSize; ++px) {
+        for (let py = 0; py < cellSize; ++py) {
           const x = Math.floor(i * cellSize + px);
           const y = Math.floor(j * cellSize + py);
           const idx = (y * CANVAS_SIZE + x) * 4;
 
+          // Color the pixels based on spin up or spin down (emerald teal up, slate gray down)
           const spin = model.grid[i][j];
           const r = spin === 1 ? 20  : 51;
           const g = spin === 1 ? 184 : 65;
           const b = spin === 1 ? 166 : 85;
 
+          // Colors set here
+          // The last 255 means that the colors are opaque, with no transparency
           data[idx] = r;
           data[idx + 1] = g;
           data[idx + 2] = b;
@@ -293,35 +342,47 @@ function drawGrid() {
       }
     }
   }
+
+  // Put the image data
   ctx.putImageData(imgData, 0, 0);
 }
 
+// Frame skipping tracker for the wolff algorithm 
 let wolffFrameSkip = 0;
+
+// Main function loop
 function loop() {
+  // Check if the simulation is currently paused
   if (!isPaused) {
     // If Hysteresis sweep is active, ramp H up/down smoothly
     if (isSweepingHysteresis) {
       const dataset = hystChart.data.datasets[0];
       const points = dataset.data as { x: number, y: number}[];
 
+      // Push the field and magnetization values currently
       points.push({ x: model.params.field, y: model.getMagnetization() });
 
+      // Shift the points once we reach the max number of points MAX_TRAIL
       const MAX_TRAIL = 400;
       if (points.length > MAX_TRAIL) {
         points.shift();
       }
 
+      // Fading effect: a dynamic range of alpha (transparency) values
+      // Old values slowly become more transparent and then disappear due to 'shift'
       const total = points.length;
       const colors = points.map((_, i) => {
         const alpha = (0.15 + 0.85*(i/total)).toFixed(2);
         return `rgba(16, 185, 129, ${alpha})`;
       });
 
+      // Set the point background and border colors
       (dataset as any).pointBackgroundColor = colors;
       (dataset as any).pointBorderColor = colors;
 
       hystChart.update('none');
 
+      // Update the current hysteresis sweeping, including the direction and end values
       let currentH = model.params.field + sweepDirection * 0.01;
       if (currentH > 2.0) {
         currentH = 2.0;
@@ -330,16 +391,22 @@ function loop() {
         currentH = -2.0;
         sweepDirection = 1;
       }
+
+      // Update the slider accordingly
       model.params.field = currentH;
       fieldSlider.value = currentH.toString();
       fieldVal.textContent = currentH.toFixed(2);
     }
 
+    // Check which algorithm is being used
     if (model.algorithm === 'metropolis') {
-      for (let s = 0; s < stepsPerFrame; s++) {
+      // If metropolis: simply step per frame
+      for (let s = 0; s < stepsPerFrame; ++s) {
         model.step();
       }
     } else {
+      // If wolff: we want to skip frames to prevent a "strobing" effect
+      // Hence we are not taking the same steps per frame necessarily
       ++wolffFrameSkip;
       if (wolffFrameSkip >= 10) {
         model.step();
@@ -347,23 +414,25 @@ function loop() {
       }
     }
 
+    // Draw the grid
     drawGrid();
 
+    // Get the current magnetization and energy values
     const currentM = model.getMagnetization();
     const currentE = model.getEnergy();
 
-    // 1. Magnetization Plot
+    // Magnetization plot
     magChart.data.datasets[0].data.push(currentM);
     magChart.data.datasets[0].data.shift();
     magChart.update('none');
 
-    // 2. Energy Plot
+    // Energy plot
     energyChart.data.datasets[0].data.push(currentE);
     energyChart.data.datasets[0].data.shift();
-    updateEnergyChartBounds();
+    updateEnergyChartBounds();  // Update the chart bounds
     energyChart.update('none');
 
-    // 3. Hysteresis Scatter Plot
+    // Hysteresis scatter plot
     if (isSweepingHysteresis) {
       const points = hystChart.data.datasets[0].data as { x: number; y: number }[];
       points.push({ x: model.params.field, y: currentM });
@@ -372,11 +441,14 @@ function loop() {
     }
   }
 
+  // Even if paused, request a new animation frame from the loop worker
   requestAnimationFrame(loop);
 }
 
+// Loop
 loop();
 
+// Here we make sure LaTeX is rendered properly from the HTML with delimeters $ and $$
 declare function renderMathInElement(element: HTMLElement, options?: object): void;
 
 window.addEventListener('DOMContentLoaded', () => {
