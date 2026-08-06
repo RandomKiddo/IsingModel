@@ -21,7 +21,6 @@ const model = new IsingModel({
 let stepsPerFrame = 1;
 
 // --- Chart Factory Helper ---
-// Increased maxPoints to 300 to show a longer time history
 const maxPoints = 300; 
 function createChart(canvasId: string, label: string, color: string, minY?: number, maxY?: number) {
   const chartCtx = (document.getElementById(canvasId) as HTMLCanvasElement).getContext('2d')!;
@@ -43,10 +42,38 @@ function createChart(canvasId: string, label: string, color: string, minY?: numb
   });
 }
 
+// 1. Line Charts (Magnetization & Energy)
 const magChart = createChart('mag-chart-canvas', 'Magnetization <M>', '#6366f1', -1.0, 1.0);
 const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899', -2.0, 2.0);
 
-// --- 1. Dynamic Energy Bounds Logic (ADDED HERE) ---
+// 2. Scatter Chart (Hysteresis M vs H)
+const hystCtx = (document.getElementById('hyst-chart-canvas') as HTMLCanvasElement).getContext('2d')!;
+const hystChart = new Chart(hystCtx, {
+  type: 'scatter',
+  data: {
+    datasets: [
+      {
+        label: 'M vs H',
+        data: [],
+        borderColor: '#10b981',
+        backgroundColor: '#10b981',
+        showLine: true,
+        pointRadius: 1.5,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    scales: {
+      x: { min: -2.0, max: 2.0, title: { display: true, text: 'Magnetic Field (H)', color: '#888899' }, grid: { color: '#2e2e38' } },
+      y: { min: -1.0, max: 1.0, title: { display: true, text: '<M>', color: '#888899' }, grid: { color: '#2e2e38' } },
+    },
+  },
+});
+
+// --- Dynamic Energy Bounds Logic ---
 let minObservedEnergy = -2.0;
 let maxObservedEnergy = 2.0;
 
@@ -87,7 +114,10 @@ const jVal = document.getElementById('j-val')!;
 const boundarySelect = document.getElementById('boundary') as HTMLSelectElement;
 const speedSlider = document.getElementById('speed') as HTMLInputElement;
 const speedVal = document.getElementById('speed-val')!;
+const algoSelect = document.getElementById('algorithm') as HTMLSelectElement;
 const resetBtn = document.getElementById('reset-btn')!;
+const resetBtnGrid = document.getElementById('reset-btn-grid')!;
+const hystBtn = document.getElementById('hysteresis-btn')!;
 
 // Synchronize controls with model state on startup
 function syncControlsWithModel() {
@@ -101,6 +131,7 @@ function syncControlsWithModel() {
   jVal.textContent = model.params.J.toFixed(2);
 
   boundarySelect.value = model.params.boundary;
+  algoSelect.value = model.algorithm;
 
   speedSlider.value = stepsPerFrame.toString();
   speedVal.textContent = stepsPerFrame.toString();
@@ -120,18 +151,22 @@ fieldSlider.addEventListener('input', () => {
   const val = parseFloat(fieldSlider.value);
   model.params.field = val;
   fieldVal.textContent = val.toFixed(2);
-  resetEnergyBounds(); // Reset scale on field change
+  resetEnergyBounds();
 });
 
 jSlider.addEventListener('input', () => {
   const val = parseFloat(jSlider.value);
   model.params.J = val;
   jVal.textContent = val.toFixed(2);
-  resetEnergyBounds(); // Reset scale on J change
+  resetEnergyBounds();
 });
 
 boundarySelect.addEventListener('change', () => {
   model.params.boundary = boundarySelect.value as BoundaryCondition;
+});
+
+algoSelect.addEventListener('change', () => {
+  model.algorithm = algoSelect.value as 'metropolis' | 'wolff';
 });
 
 speedSlider.addEventListener('input', () => {
@@ -143,13 +178,63 @@ resetBtn.addEventListener('click', () => {
   model.grid = Array.from({ length: GRID_SIZE }, () =>
     Array.from({ length: GRID_SIZE }, () => (Math.random() < 0.5 ? 1 : -1))
   );
-  resetEnergyBounds(); // Reset scale on manual grid reset
+  resetEnergyBounds();
+});
+
+resetBtnGrid.addEventListener('click', () => {
+  model.params.temperature = 2.27;
+  tempSlider.value = '2.27';
+  tempVal.textContent = '2.27';
+
+  model.params.field = 0.0;
+  fieldSlider.value = '0.0';
+  fieldVal.textContent = '0.0';
+
+  model.params.J = 1.0;
+  jSlider.value = '1.0';
+  jVal.textContent = '1.0';
+
+  model.params.boundary = 'periodic';
+  boundarySelect.value = 'periodic';
+
+  model.algorithm = 'metropolis';
+  algoSelect.value = 'metropolis';
+
+  isSweepingHysteresis = false;
+  hystBtn.textContent = 'Start Field Sweep ($H$)';
+  if (typeof renderMathInElement === 'function') {
+    renderMathInElement(hystBtn, {
+      delimiters: [{ left: '$', right: '$', display: false }],
+    });
+  }
+
+  speedSlider.value = '1';
+  speedVal.textContent = '1';
 });
 
 // Presets
 document.getElementById('preset-zero')!.addEventListener('click', () => setTemperature(0.1));
 document.getElementById('preset-tc')!.addEventListener('click', () => setTemperature(2.27));
 document.getElementById('preset-high')!.addEventListener('click', () => setTemperature(5.0));
+
+// --- Hysteresis Auto-Sweep Logic ---
+let isSweepingHysteresis = false;
+let sweepDirection = 1; // 1 = increasing H, -1 = decreasing H
+
+hystBtn.addEventListener('click', () => {
+  isSweepingHysteresis = !isSweepingHysteresis;
+  hystBtn.textContent = isSweepingHysteresis ? 'Stop Field Sweep' : 'Start Field Sweep ($H$)';
+  
+  if (typeof renderMathInElement === 'function') {
+    renderMathInElement(hystBtn, {
+      delimiters: [{ left: '$', right: '$', display: false }],
+    });
+  }
+  
+  if (isSweepingHysteresis) {
+    hystChart.data.datasets[0].data = []; // Clear previous loop data
+  }
+});
 
 // --- Render Loop ---
 function drawGrid() {
@@ -174,25 +259,58 @@ function drawGrid() {
   ctx.putImageData(imgData, 0, 0);
 }
 
+let wolffFrameSkip = 0;
 function loop() {
-  for (let s = 0; s < stepsPerFrame; s++) {
-    model.step();
+  // If Hysteresis sweep is active, ramp H up/down smoothly
+  if (isSweepingHysteresis) {
+    let currentH = model.params.field + sweepDirection * 0.01;
+    if (currentH > 2.0) {
+      currentH = 2.0;
+      sweepDirection = -1;
+    } else if (currentH < -2.0) {
+      currentH = -2.0;
+      sweepDirection = 1;
+    }
+    model.params.field = currentH;
+    fieldSlider.value = currentH.toString();
+    fieldVal.textContent = currentH.toFixed(2);
+  }
+
+  if (model.algorithm === 'metropolis') {
+    for (let s = 0; s < stepsPerFrame; s++) {
+      model.step();
+    }
+  } else {
+    ++wolffFrameSkip;
+    if (wolffFrameSkip >= 10) {
+      model.step();
+      wolffFrameSkip =0 ;
+    }
   }
 
   drawGrid();
 
-  // Magnetization Plot
-  magChart.data.datasets[0].data.push(model.getMagnetization());
+  const currentM = model.getMagnetization();
+  const currentE = model.getEnergy();
+
+  // 1. Magnetization Plot
+  magChart.data.datasets[0].data.push(currentM);
   magChart.data.datasets[0].data.shift();
   magChart.update('none');
 
-  // --- 2. Energy Plot Call with Bound Check (UPDATED HERE) ---
-  const currentE = model.getEnergy();
+  // 2. Energy Plot
   updateEnergyChartBounds(currentE);
-
   energyChart.data.datasets[0].data.push(currentE);
   energyChart.data.datasets[0].data.shift();
   energyChart.update('none');
+
+  // 3. Hysteresis Scatter Plot
+  if (isSweepingHysteresis) {
+    const points = hystChart.data.datasets[0].data as { x: number; y: number }[];
+    points.push({ x: model.params.field, y: currentM });
+    if (points.length > 400) points.shift(); // Keep latest 400 points
+    hystChart.update('none');
+  }
 
   requestAnimationFrame(loop);
 }

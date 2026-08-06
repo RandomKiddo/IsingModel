@@ -25,6 +25,7 @@ export interface ModelParams {
 export class IsingModel {
     public params: ModelParams;
     public grid: number[][];
+    public algorithm: 'metropolis' | 'wolff' = 'metropolis';
 
     constructor(params: ModelParams) {
         this.params = params;
@@ -57,24 +58,71 @@ export class IsingModel {
     }
 
     public step(): void {
+        if (this.algorithm === 'metropolis') {
+            this.stepMetropolis();
+        } else {
+            this.stepWolff();
+        }
+    }
+
+    private stepMetropolis(): void {
         const N = this.params.size;
-        const { temperature: T, field: H, J } = this.params;
 
         for (let k = 0; k < N*N; ++k) {
-            const i = Math.floor(Math.random() * N);
-            const j = Math.floor(Math.random() * N);
-            const spin = this.grid[i][j];
+            const i = Math.floor(Math.random()*N);
+            const j = Math.floor(Math.random()*N);
 
-            const neighbors = 
-                this.getSpin(i+1, j) +
-                this.getSpin(i-1, j) +
-                this.getSpin(i, j+1) +
-                this.getSpin(i, j-1);
-            
-            const deltaE = 2 * spin * (J*neighbors + H);
+            const currentSpin = this.grid[i][j];
 
-            if (deltaE <= 0 || Math.random() < Math.exp(-deltaE/T)) {
-                this.grid[i][j] = -spin; // Flip accepted
+            const neighbors =
+            this.getSpin(i+1, j) +
+            this.getSpin(i-1, j) +
+            this.getSpin(i, j+1) +
+            this.getSpin(i, j-1);
+
+            const dE = 2*currentSpin * (this.params.J*neighbors + this.params.field);
+
+            if (dE <= 0 || Math.random() < Math.exp(-dE/this.params.temperature)) {
+                this.grid[i][j] = -currentSpin;
+            }
+        }
+    }
+
+    private stepWolff(): void {
+        const N = this.params.size;
+        const seedI = Math.floor(Math.random()*N);
+        const seedJ = Math.floor(Math.random()*N);
+        const clusterSpin = this.grid[seedI][seedJ];
+
+        const pAdd = 1-Math.exp(-2*this.params.J/this.params.temperature);
+        if (pAdd <= 0) {
+            return;
+        }
+
+        const stack: [number, number][] = [[seedI, seedJ]];
+
+        const inCluster = new Uint8Array(N*N);
+        inCluster[seedI*N + seedJ] = 1;
+
+        while (stack.length > 0) {
+            const [i, j] = stack.pop()!;
+            this.grid[i][j] = -clusterSpin;
+
+            const neighbors: [number, number][] = [
+                [(i+1)%N, j],
+                [(i-1+N)%N, j],
+                [i, (j+1)%N],
+                [i, (j-1+N)%N],
+            ];
+
+            for (const [ni, nj] of neighbors) {
+                const idx = ni*N + nj;
+                if (!inCluster[idx] && this.grid[ni][nj] === clusterSpin) {
+                    if (Math.random() < pAdd) {
+                        inCluster[idx] = 1;
+                        stack.push([ni, nj]);
+                    }
+                }
             }
         }
     }

@@ -25,6 +25,8 @@ body {
   flex-direction: column;
   gap: 20px;
   border-right: 1px solid #2e2e38;
+  overflow-y: auto;
+  max-height: 100vh;
 }
 
 .sidebar h2 {

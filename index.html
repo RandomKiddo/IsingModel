@@ -46,6 +46,20 @@
         </div>
 
         <div class="control-group">
+          <label for="algorithm">Algorithm Engine</label>
+          <select id="algorithm">
+            <option value="metropolis">Metropolis (Local Flips)</option>
+            <option value="'wolff">Wolff (Cluster Flips)<sup>*</sup></option>
+          </select>
+          <small class="hint">*Frame-throttled to prevent "strobe" effect</small>
+        </div>
+
+        <div class="control-group">
+          <label>Hysteresis Auto-Sweep</label>
+          <button id="hysteresis-btn" class="preset-btn">Start Field Sweep ($H$)</button>
+        </div>
+
+        <div class="control-group">
           <label for="speed">Simulation Speed: <span id="speed-val">1</span>x</label>
           <input type="range" id="speed" min="1" max="20" step="1" value="1" autocomplete="off" />
           <small class="hint">Sweeps per animation frame</small>
@@ -61,6 +75,7 @@
         </div>
 
         <button id="reset-btn">Reset Grid (Random)</button>
+        <button id="reset-btn-grid">Reset All Parameters</button>
       </aside>
 
       <main class="main-content">
@@ -80,6 +95,13 @@
           <h3>Energy per Spin ($E$) over Time</h3>
           <div class="chart-container">
             <canvas id="energy-chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="view-panel">
+          <h3>Hysteresis Loop ($\langle M\rangle$ vs $H$)</h3>
+          <div class="chart-container">
+            <canvas id="hyst-chart-canvas"></canvas>
           </div>
         </div>
       </main>
