@@ -115,6 +115,7 @@ button:hover {
   height: 400px;
   image-rendering: pixelated;
   border-radius: 4px;
+  border: 1px solid #3a3a4a;
 }
 
 .chart-container {

@@ -22,7 +22,7 @@ let stepsPerFrame = 1;
 
 // --- Chart Factory Helper ---
 const maxPoints = 300; 
-function createChart(canvasId: string, label: string, color: string, minY?: number, maxY?: number) {
+function createChart(canvasId: string, label: string, color: string, yTitle: string, minY?: number, maxY?: number) {
   const chartCtx = (document.getElementById(canvasId) as HTMLCanvasElement).getContext('2d')!;
   return new Chart(chartCtx, {
     type: 'line',
@@ -35,16 +35,16 @@ function createChart(canvasId: string, label: string, color: string, minY?: numb
       maintainAspectRatio: false,
       animation: false,
       scales: {
-        y: { min: minY, max: maxY, grid: { color: '#2e2e38' } },
-        x: { display: false },
+        y: { min: minY, max: maxY, grid: { color: '#2e2e38' }, title: { display: true, text: yTitle, color: '#888899', font: { size: 11 } } },
+        x: { title: { display: true, text: 'Time (Steps)', color: '#888899', font: { size: 11 } }, ticks: { display: false } },
       },
     },
   });
 }
 
 // 1. Line Charts (Magnetization & Energy)
-const magChart = createChart('mag-chart-canvas', 'Magnetization <M>', '#6366f1', -1.0, 1.0);
-const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899', -2.0, 2.0);
+const magChart = createChart('mag-chart-canvas', 'Magnetization ⟨M⟩', '#6366f1', 'Magnetization ⟨M⟩', -1.0, 1.0);
+const energyChart = createChart('energy-chart-canvas', 'Energy per Spin (E)', '#ec4899', 'Energy per Spin (E)', -2.0, 2.0);
 
 // 2. Scatter Chart (Hysteresis M vs H)
 const hystCtx = (document.getElementById('hyst-chart-canvas') as HTMLCanvasElement).getContext('2d')!;
@@ -56,7 +56,7 @@ const hystChart = new Chart(hystCtx, {
         label: 'M vs H',
         data: [],
         borderColor: '#10b981',
-        backgroundColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
         showLine: true,
         pointRadius: 1.5,
       },
@@ -68,8 +68,15 @@ const hystChart = new Chart(hystCtx, {
     animation: false,
     scales: {
       x: { min: -2.0, max: 2.0, title: { display: true, text: 'Magnetic Field (H)', color: '#888899' }, grid: { color: '#2e2e38' } },
-      y: { min: -1.0, max: 1.0, title: { display: true, text: '<M>', color: '#888899' }, grid: { color: '#2e2e38' } },
+      y: { min: -1.0, max: 1.0, title: { display: true, text: 'Magnetization ⟨M⟩', color: '#888899' }, grid: { color: '#2e2e38' } },
     },
+    plugins: {
+      legend: {
+        labels: {
+          usePointStyle: false,
+        }
+      }
+    }
   },
 });
 
@@ -77,21 +84,32 @@ const hystChart = new Chart(hystCtx, {
 let minObservedEnergy = -2.0;
 let maxObservedEnergy = 2.0;
 
-function updateEnergyChartBounds(currentE: number) {
-  let boundsChanged = false;
+function updateEnergyChartBounds() {
+  const currentData = energyChart.data.datasets[0].data as number[];
 
-  if (currentE < minObservedEnergy) {
-    minObservedEnergy = currentE - Math.abs(currentE * 0.15);
-    boundsChanged = true;
-  }
-  if (currentE > maxObservedEnergy) {
-    maxObservedEnergy = currentE + Math.abs(currentE * 0.15);
-    boundsChanged = true;
+  if (currentData.length === 0) {
+    return;
   }
 
-  if (boundsChanged && energyChart.options.scales?.y) {
-    energyChart.options.scales.y.min = minObservedEnergy;
-    energyChart.options.scales.y.max = maxObservedEnergy;
+  let min = Math.min(...currentData);
+  let max = Math.max(...currentData);
+
+  let span = max-min; 
+
+  const MIN_SPAN = 1.0;
+  if (span < MIN_SPAN) {
+    const mid = (min+max)/2;
+    min = mid - MIN_SPAN/2;
+    max = max + MIN_SPAN/2;
+    span = MIN_SPAN;
+  }
+
+  const paddedMin = min - span*0.15;
+  const paddedMax = max + span*0.15;
+
+  if (energyChart.options.scales?.y) {
+    energyChart.options.scales.y.min = paddedMin;
+    energyChart.options.scales.y.max = paddedMax;
   }
 }
 
@@ -244,13 +262,20 @@ function drawGrid() {
 
   for (let i = 0; i < GRID_SIZE; i++) {
     for (let j = 0; j < GRID_SIZE; j++) {
-      const color = model.grid[i][j] === 1 ? 255 : 0;
       for (let px = 0; px < cellSize; px++) {
         for (let py = 0; py < cellSize; py++) {
           const x = Math.floor(i * cellSize + px);
           const y = Math.floor(j * cellSize + py);
           const idx = (y * CANVAS_SIZE + x) * 4;
-          data[idx] = data[idx + 1] = data[idx + 2] = color;
+
+          const spin = model.grid[i][j];
+          const r = spin === 1 ? 20  : 51;
+          const g = spin === 1 ? 184 : 65;
+          const b = spin === 1 ? 166 : 85;
+
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
           data[idx + 3] = 255;
         }
       }
@@ -299,9 +324,9 @@ function loop() {
   magChart.update('none');
 
   // 2. Energy Plot
-  updateEnergyChartBounds(currentE);
   energyChart.data.datasets[0].data.push(currentE);
   energyChart.data.datasets[0].data.shift();
+  updateEnergyChartBounds();
   energyChart.update('none');
 
   // 3. Hysteresis Scatter Plot
