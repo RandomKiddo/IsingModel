@@ -140,6 +140,7 @@ const algoSelect = document.getElementById('algorithm') as HTMLSelectElement;
 const resetBtn = document.getElementById('reset-btn')!;
 const resetBtnGrid = document.getElementById('reset-btn-grid')!;
 const hystBtn = document.getElementById('hysteresis-btn')!;
+const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 
 // Synchronize controls with model state on startup
 function syncControlsWithModel() {
@@ -234,6 +235,13 @@ resetBtnGrid.addEventListener('click', () => {
   speedVal.textContent = '1';
 });
 
+let isPaused = false;
+pauseBtn.addEventListener('click', () =>{
+  isPaused = !isPaused;
+  pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+  pauseBtn.classList.toggle('active', isPaused);
+})
+
 // Presets
 document.getElementById('preset-zero')!.addEventListener('click', () => setTemperature(0.1));
 document.getElementById('preset-tc')!.addEventListener('click', () => setTemperature(2.27));
@@ -290,76 +298,78 @@ function drawGrid() {
 
 let wolffFrameSkip = 0;
 function loop() {
-  // If Hysteresis sweep is active, ramp H up/down smoothly
-  if (isSweepingHysteresis) {
-    const dataset = hystChart.data.datasets[0];
-    const points = dataset.data as { x: number, y: number}[];
+  if (!isPaused) {
+    // If Hysteresis sweep is active, ramp H up/down smoothly
+    if (isSweepingHysteresis) {
+      const dataset = hystChart.data.datasets[0];
+      const points = dataset.data as { x: number, y: number}[];
 
-    points.push({ x: model.params.field, y: model.getMagnetization() });
+      points.push({ x: model.params.field, y: model.getMagnetization() });
 
-    const MAX_TRAIL = 400;
-    if (points.length > MAX_TRAIL) {
-      points.shift();
+      const MAX_TRAIL = 400;
+      if (points.length > MAX_TRAIL) {
+        points.shift();
+      }
+
+      const total = points.length;
+      const colors = points.map((_, i) => {
+        const alpha = (0.15 + 0.85*(i/total)).toFixed(2);
+        return `rgba(16, 185, 129, ${alpha})`;
+      });
+
+      (dataset as any).pointBackgroundColor = colors;
+      (dataset as any).pointBorderColor = colors;
+
+      hystChart.update('none');
+
+      let currentH = model.params.field + sweepDirection * 0.01;
+      if (currentH > 2.0) {
+        currentH = 2.0;
+        sweepDirection = -1;
+      } else if (currentH < -2.0) {
+        currentH = -2.0;
+        sweepDirection = 1;
+      }
+      model.params.field = currentH;
+      fieldSlider.value = currentH.toString();
+      fieldVal.textContent = currentH.toFixed(2);
     }
 
-    const total = points.length;
-    const colors = points.map((_, i) => {
-      const alpha = (0.15 + 0.85*(i/total)).toFixed(2);
-      return `rgba(16, 185, 129, ${alpha})`;
-    });
-
-    (dataset as any).pointBackgroundColor = colors;
-    (dataset as any).pointBorderColor = colors;
-
-    hystChart.update('none');
-
-    let currentH = model.params.field + sweepDirection * 0.01;
-    if (currentH > 2.0) {
-      currentH = 2.0;
-      sweepDirection = -1;
-    } else if (currentH < -2.0) {
-      currentH = -2.0;
-      sweepDirection = 1;
+    if (model.algorithm === 'metropolis') {
+      for (let s = 0; s < stepsPerFrame; s++) {
+        model.step();
+      }
+    } else {
+      ++wolffFrameSkip;
+      if (wolffFrameSkip >= 10) {
+        model.step();
+        wolffFrameSkip =0 ;
+      }
     }
-    model.params.field = currentH;
-    fieldSlider.value = currentH.toString();
-    fieldVal.textContent = currentH.toFixed(2);
-  }
 
-  if (model.algorithm === 'metropolis') {
-    for (let s = 0; s < stepsPerFrame; s++) {
-      model.step();
+    drawGrid();
+
+    const currentM = model.getMagnetization();
+    const currentE = model.getEnergy();
+
+    // 1. Magnetization Plot
+    magChart.data.datasets[0].data.push(currentM);
+    magChart.data.datasets[0].data.shift();
+    magChart.update('none');
+
+    // 2. Energy Plot
+    energyChart.data.datasets[0].data.push(currentE);
+    energyChart.data.datasets[0].data.shift();
+    updateEnergyChartBounds();
+    energyChart.update('none');
+
+    // 3. Hysteresis Scatter Plot
+    if (isSweepingHysteresis) {
+      const points = hystChart.data.datasets[0].data as { x: number; y: number }[];
+      points.push({ x: model.params.field, y: currentM });
+      if (points.length > 400) points.shift(); // Keep latest 400 points
+      hystChart.update('none');
     }
-  } else {
-    ++wolffFrameSkip;
-    if (wolffFrameSkip >= 10) {
-      model.step();
-      wolffFrameSkip =0 ;
-    }
-  }
-
-  drawGrid();
-
-  const currentM = model.getMagnetization();
-  const currentE = model.getEnergy();
-
-  // 1. Magnetization Plot
-  magChart.data.datasets[0].data.push(currentM);
-  magChart.data.datasets[0].data.shift();
-  magChart.update('none');
-
-  // 2. Energy Plot
-  energyChart.data.datasets[0].data.push(currentE);
-  energyChart.data.datasets[0].data.shift();
-  updateEnergyChartBounds();
-  energyChart.update('none');
-
-  // 3. Hysteresis Scatter Plot
-  if (isSweepingHysteresis) {
-    const points = hystChart.data.datasets[0].data as { x: number; y: number }[];
-    points.push({ x: model.params.field, y: currentM });
-    if (points.length > 400) points.shift(); // Keep latest 400 points
-    hystChart.update('none');
   }
 
   requestAnimationFrame(loop);
