@@ -99,7 +99,7 @@ The compiled bundle will be outputted to the `dist/` folder.
 
 This repository includes a pre-configured GitHub Actions workflow in `.github/workflows/deploy.yml` that automatically builds and deploys the Vite application to GitHub Pages whenever changes are pushed to `master`.
 
-You can view the live deployment [here]().
+You can view the live deployment [here](https://neilghugare.com/IsingModel/).
 
 ## 📜 License
 
