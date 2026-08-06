@@ -43,7 +43,7 @@ $$
 * Below $T_{\rm c}$ ($T<T_{\rm c}$): Spontaneous symmetry breaking forms large aligned domains with non-zero net magnetization ($\langle M\rangle \neq 0$).
 * Above $T_{\rm c}$ ($T>T_{\rm c}$): Thermal fluctuations dominate, destroying long-range order ($\langle M\rangle \rightarrow 0$).
 
-For more information, see the [blog post]().
+For more information, see the [blog post](https://neilghugare.com/blog/programming/2026-08-06-ising-model/).
 
 ## 🛠️ Tech Stack & Optimizations
 
