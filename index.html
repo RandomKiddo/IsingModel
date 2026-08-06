@@ -16,26 +16,32 @@
 
   <body>
     <div class="app-container">
+
+      <!-- Sidebar -->
       <aside class="sidebar">
         <h2>Ising Model Controls</h2>
 
+        <!-- Temperature slider -->
         <div class="control-group">
           <label for="temp">Temperature ($T$): <span id="temp-val">2.27</span></label>
           <input type="range" id="temp" min="0.1" max="5.0" step="0.01" value="2.27" autocomplete="off" />
           <small class="hint">Critical Temp $T_{\rm c}\approx 2.269$</small>
         </div>
 
+        <!-- Magnetic field slider -->
         <div class="control-group">
           <label for="field">Magnetic Field ($H$): <span id="field-val">0.00</span></label>
           <input type="range" id="field" min="-2.0" max="2.0" step="0.05" value="0.0" autocomplete="off" />
         </div>
 
+        <!-- Coupling constant slider -->
         <div class="control-group">
           <label for="coupling">Coupling Constant ($J$): <span id="j-val">1.00</span></label>
           <input type="range" id="coupling" min="-2.0" max="2.0" step="0.1" value="1.0" autocomplete="off" />
           <small class="hint">$J > 0$ Ferromagnetic <br /> $J &lt; 0$ Antiferromagnetic</small>
         </div>
 
+        <!-- Boundary condition selector dropdown -->
         <div class="control-group">
           <label for="boundary">Boundary Condition</label>
           <select id="boundary">
@@ -45,6 +51,7 @@
           </select>
         </div>
 
+        <!-- Algorithm engine selector dropdown -->
         <div class="control-group">
           <label for="algorithm">Algorithm Engine</label>
           <select id="algorithm">
@@ -54,17 +61,20 @@
           <small class="hint">*Frame-throttled to prevent "strobe" effect</small>
         </div>
 
+        <!-- Hysteresis auto-sweep button -->
         <div class="control-group">
           <label>Hysteresis Auto-Sweep</label>
           <button id="hysteresis-btn" class="preset-btn">Start Field Sweep ($H$)</button>
         </div>
 
+        <!-- Simulation speed slider -->
         <div class="control-group">
           <label for="speed">Simulation Speed: <span id="speed-val">1</span>x</label>
           <input type="range" id="speed" min="1" max="20" step="1" value="1" autocomplete="off" />
           <small class="hint">Sweeps per animation frame</small>
         </div>
 
+        <!-- Temperature preset buttons -->
         <div class="control-group">
           <label>Temperature Presets</label>
           <div class="preset-buttons">
@@ -74,14 +84,18 @@
           </div>
         </div>
 
+        <!-- Reset buttons for pausing, grid reset, and parameter reset -->
         <div class="button-group" style="display: flex; gap: 8px; margin-top: 16px;">
           <button id="pause-btn" class="action-btn" style="flex: 1;">Pause</button>
           <button id="reset-btn" style="flex: 1;">Reset Grid</button>
         </div>
         <button id="reset-btn-grid">Reset All Parameters</button>
       </aside>
+      <!-- Sidebar end -->
 
+      <!-- Main content screen-->
       <main class="main-content">
+        <!-- Lattice visualization panel -->
         <div class="view-panel">
           <h3>Lattice Visualization</h3>
           <small class="hint" style="padding-bottom: 3px;">
@@ -91,6 +105,7 @@
           <canvas id="grid-canvas"></canvas>
         </div>
 
+        <!-- Magnetization vs. time graph panel -->
         <div class="view-panel">
           <h3>Magnetization ($\langle M \rangle$) over Time</h3>
           <div class="chart-container">
@@ -98,6 +113,7 @@
           </div>
         </div>
 
+        <!-- Energy per spin vs. time graph panel -->
         <div class="view-panel">
           <h3>Energy per Spin ($E$) over Time</h3>
           <div class="chart-container">
@@ -105,6 +121,7 @@
           </div>
         </div>
 
+        <!-- Hysteresis loop panel -->
         <div class="view-panel">
           <h3>Hysteresis Loop ($\langle M\rangle$ vs $H$)</h3>
           <div class="chart-container">
@@ -112,8 +129,10 @@
           </div>
         </div>
       </main>
+      <!-- Main content screen end -->
     </div>
 
+    <!-- The main TypeScript loop -->
     <script type="module" src="./src/main.ts"></script>
 
   </body>
