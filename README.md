@@ -85,7 +85,7 @@ npm install
 npm run dev
 ```
 
-4. Open your browser and navigate to the `localhost`, typically `http://localhost:5173/IsingModel/`. 
+4. Open your browser and navigate to the `localhost`, typically `http://localhost:5173/IsingModel/` or `http://localhost:5173/`. 
 
 ### Build for Production
 
