@@ -53,12 +53,16 @@ const hystChart = new Chart(hystCtx, {
   data: {
     datasets: [
       {
-        label: 'M vs H',
+        type: 'line',
+        label: '⟨M⟩ vs H',
         data: [],
         borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-        showLine: true,
-        pointRadius: 1.5,
+        backgroundColor: '#10b981',
+        showLine: false,
+        pointRadius: 1.25,
+        borderWidth: 1.25,
+        pointBackgroundColor: [],
+        pointBorderColor: [],
       },
     ],
   },
@@ -73,7 +77,7 @@ const hystChart = new Chart(hystCtx, {
     plugins: {
       legend: {
         labels: {
-          usePointStyle: false,
+          usePointStyle: false
         }
       }
     }
@@ -288,6 +292,27 @@ let wolffFrameSkip = 0;
 function loop() {
   // If Hysteresis sweep is active, ramp H up/down smoothly
   if (isSweepingHysteresis) {
+    const dataset = hystChart.data.datasets[0];
+    const points = dataset.data as { x: number, y: number}[];
+
+    points.push({ x: model.params.field, y: model.getMagnetization() });
+
+    const MAX_TRAIL = 400;
+    if (points.length > MAX_TRAIL) {
+      points.shift();
+    }
+
+    const total = points.length;
+    const colors = points.map((_, i) => {
+      const alpha = (0.15 + 0.85*(i/total)).toFixed(2);
+      return `rgba(16, 185, 129, ${alpha})`;
+    });
+
+    (dataset as any).pointBackgroundColor = colors;
+    (dataset as any).pointBorderColor = colors;
+
+    hystChart.update('none');
+
     let currentH = model.params.field + sweepDirection * 0.01;
     if (currentH > 2.0) {
       currentH = 2.0;
