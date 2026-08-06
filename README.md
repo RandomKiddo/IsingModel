@@ -1,6 +1,6 @@
 # 2D Ising Model Simulation
 
-An interactive, real-time web application simulating phase transitions and critical phenomena in the 2D Ising model using TypeSCript, HTML 5 Canvas, and Chart.js.
+An interactive, real-time web application simulating phase transitions and critical phenomena in the 2D Ising model using TypeScript, HTML 5 Canvas, and Chart.js.
 
 ## 📄 Overview
 
